@@ -20,7 +20,7 @@ object homework_hkt_impllicts {
     override def flatMap[B](f: A => Option[B]): Option[B] = opt.flatMap(f)
   }
 
-  implicit def optBindable[A](opt: List[A]): Bindable[List, A] = new Bindable[List, A] {
+  implicit def listBindable[A](opt: List[A]): Bindable[List, A] = new Bindable[List, A] {
     override def map[B](f: A => B): List[B] = opt.map(f)
 
     override def flatMap[B](f: A => List[B]): List[B] = opt.flatMap(f)
