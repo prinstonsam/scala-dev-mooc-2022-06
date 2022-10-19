@@ -1,11 +1,6 @@
 package futures
 
-import HomeworksUtils.TaskSyntax
-import zio.CancelableFuture
-
-import scala.concurrent.impl.Promise
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 object task_futures_sequence {
 
