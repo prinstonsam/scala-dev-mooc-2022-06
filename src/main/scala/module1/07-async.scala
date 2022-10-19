@@ -15,12 +15,12 @@ import scala.util.{Failure, Success, Try, Using}
 
 object threads {
 
- class Thread1 extends Thread{
-   override def run(): Unit = {
-     println(s"Hello from " +
-       s"${Thread.currentThread().getName}")
-   }
- }
+  class Thread1 extends Thread {
+    override def run(): Unit = {
+      println(s"Hello from " +
+        s"${Thread.currentThread().getName}")
+    }
+  }
 
 
   def printRunningTime(v: => Unit): Unit = {
@@ -30,17 +30,17 @@ object threads {
     println(s"Execution time ${end - start}")
   }
 
-  def getRatesLocation1 = async{
+  def getRatesLocation1 = async {
     Thread.sleep(1000)
     println("GetRatesLocation1")
   }
 
-  def getRatesLocation2 = async{
+  def getRatesLocation2 = async {
     Thread.sleep(2000)
     println("GetRatesLocation2")
   }
 
-  def async(f: => Unit): Thread = new Thread{
+  def async(f: => Unit): Thread = new Thread {
     override def run(): Unit = f
   }
 
@@ -56,7 +56,7 @@ object threads {
     v
   }
 
-  def getRatesLocation3 = async2{
+  def getRatesLocation3 = async2 {
     Thread.sleep(1000)
     println(s"Hello from " +
       s"${Thread.currentThread().getName}")
@@ -64,7 +64,7 @@ object threads {
     10
   }
 
-  def getRatesLocation4 = async2{
+  def getRatesLocation4 = async2 {
     Thread.sleep(2000)
     println(s"Hello from " +
       s"${Thread.currentThread().getName}")
@@ -73,17 +73,18 @@ object threads {
   }
 
 
-  class ToyFuture[T]private (v: () => T){
+  class ToyFuture[T] private(v: () => T) {
     private var r: T = null.asInstanceOf[T]
     private var isCompleted: Boolean = false
     private val q = mutable.Queue[T => _]()
 
 
     def map[B](f: T => B): ToyFuture[B] = ???
+
     def flatMap[B](f: T => ToyFuture[B]): ToyFuture[B] = ???
 
     def onComplete[U](f: T => U): Unit = {
-      if(isCompleted) f(r)
+      if (isCompleted) f(r)
       else q.enqueue(f)
     }
 
@@ -93,7 +94,7 @@ object threads {
           val result = v()
           r = result
           isCompleted = true
-          while (q.nonEmpty){
+          while (q.nonEmpty) {
             q.dequeue()(result)
           }
         }
@@ -103,7 +104,7 @@ object threads {
 
   }
 
-  object ToyFuture{
+  object ToyFuture {
     def apply[T](v: => T)(implicit executor: Executor): ToyFuture[T] = {
       val f = new ToyFuture[T](() => v)
       f.start(executor)
@@ -113,7 +114,7 @@ object threads {
 
   implicit val ex: Executor = executor.pool1
 
-  def getRatesLocation5 = ToyFuture{
+  def getRatesLocation5 = ToyFuture {
     Thread.sleep(1000)
     println(s"Hello from " +
       s"${Thread.currentThread().getName}")
@@ -121,7 +122,7 @@ object threads {
     10
   }
 
-  def getRatesLocation6 = ToyFuture{
+  def getRatesLocation6 = ToyFuture {
     Thread.sleep(2000)
     println(s"Hello from " +
       s"${Thread.currentThread().getName}")
@@ -143,27 +144,41 @@ object threads {
 }
 
 
-
-
-
-
-
 object executor {
-      val pool1: ExecutorService = Executors.newFixedThreadPool(2, NameableThreads("fixed-pool-1"))
-      val pool2: ExecutorService = Executors.newCachedThreadPool(NameableThreads("cached-pool-2"))
-      val pool3: ExecutorService = Executors.newWorkStealingPool(4)
-      val pool4: ExecutorService = Executors.newSingleThreadExecutor(NameableThreads("singleThread-pool-4"))
+  val pool1: ExecutorService = Executors.newFixedThreadPool(2, NameableThreads("fixed-pool-1"))
+  val pool2: ExecutorService = Executors.newCachedThreadPool(NameableThreads("cached-pool-2"))
+  val pool3: ExecutorService = Executors.newWorkStealingPool(4)
+  val pool4: ExecutorService = Executors.newSingleThreadExecutor(NameableThreads("singleThread-pool-4"))
 }
 
-object tryObj{
+/**
+ * Try:
+ * - безопасно выполнить вычисление, котоое потенциально может завершиться с ошибкой
+ * - отделить логику обработки ошибки от вычисления
+ *
+ * ADT - sum
+ * sealed abstract class Try[+T]
+ * final case class Failure[+T](exception: Throwable) extends Try[T]
+ * final case class Success[+T](value: T) extends Try[T]
+ */
 
 
-  def readFromFile(): List[Int] = {
+object tryObj {
+
+
+  def readFromFile(): List[String] = {
     val s: BufferedSource =
       Source.fromFile(new File("ints.txt"))
 
-    val result: List[Int] = try{
-      s.getLines().toList.map(_.toInt)
+    //если exception здесь - то ресурс не закроетсяя
+    /*
+        val result = s.getLines().toList
+        s.close()
+        result
+    */
+    //Никакой трансформации
+    val result = try {
+      s.getLines().toList
     } catch {
       case e =>
         println(e.getMessage)
@@ -174,16 +189,14 @@ object tryObj{
     result
   }
 
-
-
-
+//Как же принести композицию? Возвращаем Try
   def readFromFile2(): Try[List[Int]] = {
     val source: Try[BufferedSource] =
       Try(Source.fromFile(new File("ints.txt")))
 
     def lines(s: Source) = Try(s.getLines().toList.map(_.toInt))
 
-    val r: Try[List[Int]] = for{
+    val r: Try[List[Int]] = for {
       s <- source
       l <- lines(s)
     } yield l
@@ -193,49 +206,88 @@ object tryObj{
 
 }
 
-object future{
 
+/**
+ * Future - это контейнер для значения, которое появляется в будующем
+ * - конструкторы
+ * - основные комбинаторы
+ * - Execution Context
+ */
+object future {
+
+  // глобальный контекст
   //import scala.concurrent.ExecutionContext.Implicits.global
+  /**
+   *
+   */
+  //  def getRatesLocation1 = Future{
+  //    Thread.sleep(1000)
+  //    println("GetRatesLocation1")
+  //    10
+  //  }
+  //
+  //  def getRatesLocation2 = Future{
+  //    Thread.sleep(2000)
+  //    println("GetRatesLocation2")
+  //    20
+  //  }
+  //
+  //  def printRunningTime[T](v: => Future[T]): Future[T] = {
+  //
+  //    for{
+  //      start <- Future.successful(System.currentTimeMillis())
+  //      r <- v
+  //      end <- Future.successful(System.currentTimeMillis())
+  //      _ <- Future.successful(println(s"Execution time ${end - start}"))
+  //    } yield r
+  //  }
+  //
 
-//  def getRatesLocation1 = Future{
-//    Thread.sleep(1000)
-//    println("GetRatesLocation1")
-//    10
-//  }
-//
-//  def getRatesLocation2 = Future{
-//    Thread.sleep(2000)
-//    println("GetRatesLocation2")
-//    20
-//  }
-//
-//  def printRunningTime[T](v: => Future[T]): Future[T] = {
-//
-//    for{
-//      start <- Future.successful(System.currentTimeMillis())
-//      r <- v
-//      end <- Future.successful(System.currentTimeMillis())
-//      _ <- Future.successful(println(s"Execution time ${end - start}"))
-//    } yield r
-//  }
-//
-//  val r1: Future[Int] = getRatesLocation1.map{ i =>
-//    i + 10
-//  }
-//
-//  getRatesLocation1.foreach{ i =>
-//    println(i)
-//  }
-//
-//  getRatesLocation1 onComplete{
-//    case Success(value) => println(value)
-//    case Failure(exception) => println(exception.getMessage)
-//  }
-//
-//  val r2: Future[Int] = getRatesLocation1.recover{
-//    case e => 0
-//  }
+  /**
+   * Этот вызов не блокирует main поток
+   * всегда возвращает Future
+   * Если failure то map не отработает
+   */
+  //  val r1: Future[Int] = getRatesLocation1.map{ i =>
+  //    i + 10
+  //  }
+  //
+  /**
+   * Здесь i + 10 не имеет смысла, foreach предназначен для side effect
+   */
+  //  getRatesLocation1.foreach{ i =>
+  //    println(i)
+  //  }
+  //
+  /**
+   * Принимает функцию Try => T
+   * тоже side effect - те Future должна быть закончена
+   */
+  //  getRatesLocation1 onComplete{
+  //    case Success(value) => println(value)
+  //    case Failure(exception) => println(exception.getMessage)
+  //  }
+  //
+  /**
+   * ^ ^
+   * Те если нужен side effect то foreeach или onComplete
+   * Если хотим изменить что то внутри future то map
+   */
 
+
+  /**
+   * Как еще обработать ошибку помимо onComplete не потеряв значение?
+   * Используем метод recover
+    */
+  //  val r2: Future[Int] = getRatesLocation1.recover{
+  //    case e => 0
+  //  }
+
+
+  /**
+   * Как создавать executionContext
+   * 1. Using Java
+   */
   val ec = ExecutionContext.fromExecutor(executor.pool1)
   val ec2 = ExecutionContext.fromExecutor(executor.pool2)
   val ec3 = ExecutionContext.fromExecutor(executor.pool3)
@@ -247,39 +299,39 @@ object future{
     v
   }
 
+
   val f1 = Future(action(10))(ec)
   val f2 = Future(action(20))(ec2)
 
-  val f3 = f1.flatMap{ v1 =>
+  /**
+   * Оборачиваем во future
+   * f1 и f2 на своих ec
+   * И еще внешне на ec3
+   * и вложенный action на ec4
+   * Action in cache
+   * Каждый выполнится на своем thread pool
+   */  val f3 = f1.flatMap { v1 =>
     action(50)
-    f2.map{ v2 =>
+    f2.map { v2 =>
       action(v1 + v2)
     }(ec4)
   }(ec3)
 
 }
 
-object promise{
+
+/**
+ * Promises
+ */
+object promise {
 
   val p1: Promise[Int] = Promise[Int]
   val f1: Future[Int] = p1.future
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  /**
+   * применение promises
+   */
   object FutureSyntax {
 
     implicit val ec: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
